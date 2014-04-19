@@ -3,7 +3,7 @@
  */
 function theme_entityreference(variables) {
   try {
-    dpm(variables);
+    //dpm(variables);
     
     var html = '';
     
@@ -45,7 +45,8 @@ function theme_entityreference(variables) {
             jqm_page_event_args: JSON.stringify({
                 id: variables.attributes.id,
                 path: path,
-                widget: variables.field_info_instance.widget
+                widget: variables.field_info_instance.widget,
+                field_name: variables.field_info_field.field_name
             })
         });
         break;
@@ -66,11 +67,11 @@ function theme_entityreference(variables) {
  */
 function _theme_entityreference_pageshow(options) {
   try {
-    dpm(options);
+    //dpm(options);
     views_datasource_get_view_result(options.path, {
         success: function(results) {
           if (results.view.count == 0) { return; }
-          dpm(results);
+          //dpm(results);
           var html = '';
           // Now that we've got the results, let's render the widget.
           if (options.widget.module == 'options') {
@@ -78,13 +79,17 @@ function _theme_entityreference_pageshow(options) {
             if (options.widget.type == 'options_buttons') {
               $.each(results[results.view.root], function(index, object) {
                   var entity = object[results.view.child];
+                  var checkbox_id = options.id + '_' + entity.nid;
                   var checkbox = {
                     title: entity.title,
                     attributes: {
-                      id: entity.nid
+                      id: checkbox_id,
+                      'class': options.field_name + ' entityreference',
+                      value: entity.nid,
+                      onclick: '_entityreference_onclick(this, \'' + options.id + '\', \'' + options.field_name + '\')'
                     }
                   };
-                  var label = {element:checkbox};
+                  var label = { element:checkbox };
                   label.element.id = checkbox.attributes.id;
                   html += theme('checkbox', checkbox) + theme('form_element_label', label);
               });
@@ -101,5 +106,46 @@ function _theme_entityreference_pageshow(options) {
     });
   }
   catch (error) { console.log('_theme_entityreference_pageshow - ' + error); }
+}
+
+/**
+ * Implements hook_assemble_form_state_into_field().
+ */
+function entityreference_assemble_form_state_into_field(entity_type, bundle,
+  form_state_value, field, instance, langcode, delta, field_key) {
+  try {
+    // For the "check boxes / radio buttons" widget, we must pass something like
+    // this: field_name: { und: [123, 456] }
+    // @see http://drupal.stackexchange.com/q/42658/10645
+    var result = [];
+    field_key.use_delta = false;
+    field_key.use_wrapper = false;
+    var ids = form_state_value.split(',');
+    $.each(ids, function(delta, id) { result.push(id); });
+    return result;
+  }
+  catch (error) { console.log('entityreference_assemble_form_state_into_field - ' + error); }
+}
+
+/**
+ *
+ */
+function _entityreference_onclick(input, input_id, field_name) {
+  try {
+    // For each checkbox that is checked for the entity reference field,
+    // build a comma separated string of the referenced entity ids, then place
+    // the string in the form element's hidden input value.
+    var ids = [];
+    var selector = '#' + drupalgap_get_page_id() + ' input.' + field_name + '.entityreference';
+    $(selector).each(function(index, object) {
+        if ($(object).is(':checked')) {
+          ids.push($(object).val());
+        }
+    });
+    var value = '';
+    if (ids.length != 0) { value = ids.join(','); }
+    $('#' + input_id).val(value);
+  }
+  catch (error) { console.log('_entityreference_onclick - ' + error); }
 }
 
