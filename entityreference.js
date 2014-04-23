@@ -3,7 +3,6 @@
  */
 function theme_entityreference(variables) {
   try {
-    //dpm(variables);
     
     var html = '';
     
@@ -67,43 +66,82 @@ function theme_entityreference(variables) {
  */
 function _theme_entityreference_pageshow(options) {
   try {
-    //dpm(options);
-    views_datasource_get_view_result(options.path, {
-        success: function(results) {
-          if (results.view.count == 0) { return; }
-          //dpm(results);
-          var html = '';
-          // Now that we've got the results, let's render the widget.
-          if (options.widget.module == 'options') {
-            // Check boxes/radio buttons.
-            if (options.widget.type == 'options_buttons') {
-              $.each(results[results.view.root], function(index, object) {
-                  var entity = object[results.view.child];
-                  var checkbox_id = options.id + '_' + entity.nid;
-                  var checkbox = {
-                    title: entity.title,
-                    attributes: {
-                      id: checkbox_id,
-                      'class': options.field_name + ' entityreference',
-                      value: entity.nid,
-                      onclick: '_entityreference_onclick(this, \'' + options.id + '\', \'' + options.field_name + '\')'
-                    }
-                  };
-                  var label = { element:checkbox };
-                  label.element.id = checkbox.attributes.id;
-                  html += theme('checkbox', checkbox) + theme('form_element_label', label);
-              });
-            }
-            else {
-              console.log('WARNING: _theme_entityreference_pageshow - unsupported widget type (' + options.widget.type + ')');
-            }
+    // We need a callback function to process this particular instance, so let's
+    // declare it first.
+    var _theme_entityreference_pageshow_success = function(entity) {
+      try {
+        // If we have an entity, it means we are editing it, so build an array
+        // of target ids, so we can easily reference them later.
+        var target_ids = [];
+        if (entity) {
+          // Handle multi lingual entities by determining the
+          // language code for the field.
+          var language = 'und';
+          if (typeof entity.language !== 'undefined' && entity.language != 'und') {
+            language = entity.language;
+            if (typeof entity[options.field_name][language] === 'undefined') { language = 'und'; }
           }
-          else {
-            console.log('WARNING: _theme_entityreference_pageshow - unsupported widget module (' + options.widget.module + ')');
-          }
-          $('#' + options.id + '_container').html(html).trigger('create');
+          $.each(entity[options.field_name][language], function(delta, reference) {
+              target_ids.push(reference.target_id);
+          });
         }
-    });
+        views_datasource_get_view_result(options.path, {
+            success: function(results) {
+              if (results.view.count == 0) { return; }
+              //dpm(results);
+              var html = '';
+              // Now that we've got the results, let's render the widget.
+              if (options.widget.module == 'options') {
+                // Check boxes/radio buttons.
+                if (options.widget.type == 'options_buttons') {
+                  $.each(results[results.view.root], function(index, object) {
+                      var referenced_entity = object[results.view.child];
+                      var checkbox_id = options.id + '_' + referenced_entity.nid;
+                      // Build the checkbox.
+                      var checkbox = {
+                        title: referenced_entity.title,
+                        attributes: {
+                          id: checkbox_id,
+                          'class': options.field_name + ' entityreference',
+                          value: referenced_entity.nid,
+                          onclick: '_entityreference_onclick(this, \'' + options.id + '\', \'' + options.field_name + '\')'
+                        }
+                      };
+                      // Check it?
+                      if ($.inArray(referenced_entity.nid, target_ids) != -1) {
+                        checkbox.attributes.checked = "";
+                      }
+                      // Build the label.
+                      var label = { element:checkbox };
+                      label.element.id = checkbox.attributes.id;
+                      // Finally, theme the checkbox.
+                      html += theme('checkbox', checkbox) + theme('form_element_label', label);
+                  });
+                }
+                else {
+                  console.log('WARNING: _theme_entityreference_pageshow - unsupported widget type (' + options.widget.type + ')');
+                }
+              }
+              else {
+                console.log('WARNING: _theme_entityreference_pageshow - unsupported widget module (' + options.widget.module + ')');
+              }
+              $('#' + options.id + '_container').html(html).trigger('create');
+            }
+        });
+      }
+      catch (error) {
+        console.log('_theme_entityreference_pageshow_success - ' + error);
+      }
+    }
+    // If we're editing an entity, we need to load the entity object, then pass
+    // it along to our success handler declared earlier. If we're not editing,
+    // just go directly to the success handler with a null entity.
+    if (typeof parseInt(arg(1)) === 'number' && arg(2) == 'edit') {
+      entity_load(arg(0), arg(1), {
+          success: _theme_entityreference_pageshow_success
+      });
+    }
+    else { _theme_entityreference_pageshow_success(null); }
   }
   catch (error) { console.log('_theme_entityreference_pageshow - ' + error); }
 }
