@@ -109,6 +109,24 @@ function _theme_entityreference_pageshow(options) {
 }
 
 /**
+ * Implements hook_field_formatter_view().
+ */
+function entityreference_field_formatter_view(entity_type, entity, field, instance, langcode, items, display) {
+  try {
+    var element = {};
+    $.each(items, function(delta, item) {
+        element[delta] = {
+          theme: 'button_link',
+          text: item[entity_primary_key_title(item['entity_type'])],
+          path: item['entity_type'] + '/' + item['target_id']
+        };
+    });
+    return element;
+  }
+  catch (error) { console.log('entityreference_field_formatter_view - ' + error); }
+}
+
+/**
  * Implements hook_assemble_form_state_into_field().
  */
 function entityreference_assemble_form_state_into_field(entity_type, bundle,
