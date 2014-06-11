@@ -74,16 +74,21 @@ function _theme_entityreference_pageshow(options) {
         // of target ids, so we can easily reference them later.
         var target_ids = [];
         if (entity) {
-          // Handle multi lingual entities by determining the
-          // language code for the field.
+          // Handle multi lingual entities by determining the language code for
+          // the field.
           var language = 'und';
           if (typeof entity.language !== 'undefined' && entity.language != 'und') {
             language = entity.language;
             if (typeof entity[options.field_name][language] === 'undefined') { language = 'und'; }
           }
-          $.each(entity[options.field_name][language], function(delta, reference) {
-              target_ids.push(reference.target_id);
-          });
+          // Skip the extraction of target ids from empty entity reference
+          // fields. Otherwise pull out the target ids.
+          if ($.isArray(entity[options.field_name]) && entity[options.field_name].length == 0) { }
+          else {
+            $.each(entity[options.field_name][language], function(delta, reference) {
+                target_ids.push(reference.target_id);
+            });
+          }
         }
         views_datasource_get_view_result(options.path, {
             success: function(results) {
