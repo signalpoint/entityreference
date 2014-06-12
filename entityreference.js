@@ -88,6 +88,10 @@ function _theme_entityreference_pageshow(options) {
             $.each(entity[options.field_name][language], function(delta, reference) {
                 target_ids.push(reference.target_id);
             });
+            // Place the target ids onto the hidden input's value.
+            if (target_ids.length > 0) {
+              $('#' + options.id).val(target_ids.join(','));
+            }
           }
         }
         views_datasource_get_view_result(options.path, {
@@ -182,7 +186,7 @@ function entityreference_assemble_form_state_into_field(entity_type, bundle,
     field_key.use_delta = false;
     field_key.use_wrapper = false;
     var ids = form_state_value.split(',');
-    $.each(ids, function(delta, id) { result.push(id); });
+    $.each(ids, function(delta, id) { if (!empty(id)) { result.push(id); } });
     return result;
   }
   catch (error) { console.log('entityreference_assemble_form_state_into_field - ' + error); }
