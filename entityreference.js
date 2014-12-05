@@ -1,14 +1,37 @@
 /**
+ * Implements hook_field_widget_form().
+ */
+function entityreference_field_widget_form(form, form_state, field, instance, langcode, items, delta, element) {
+  try {
+    items[delta].type = 'textfield';
+    items[delta].children.push({
+        markup: theme('entityreference', {
+            field_info_field: field,
+            field_info_instance: instance
+        })
+    });
+  }
+  catch (error) { console.log('entityreference_field_widget_form - ' + error); }
+}
+
+/**
  * Theme's an entity reference field.
  */
 function theme_entityreference(variables) {
   try {
     
+    // @TODO - this function name is misleading because its primarily used to
+    // provide the widget during node creation/editing, and not associated with
+    // the public display of the field, which is typically the case when using
+    // a theme('example', ...) call.
+    
     var html = '';
+    
+    var field_name = variables.field_info_field.field_name;
     
     // We'll make the actual field hidden, and the widget will populate the
     // hidden input later.
-    html += '<input type="hidden" ' + drupalgap_attributes(variables.attributes) + '/>';
+    //html += '<input type="hidden" ' + drupalgap_attributes(variables.attributes) + '/>';
     
     // We'll also add an empty div container where the widget will get rendered.
     html += '<div id="' + variables.attributes.id + '_container"></div>';
@@ -45,13 +68,16 @@ function theme_entityreference(variables) {
                 id: variables.attributes.id,
                 path: path,
                 widget: variables.field_info_instance.widget,
-                field_name: variables.field_info_field.field_name
+                field_name: field_name
             })
         });
         break;
       
       default:
         console.log('WARNING: theme_entityreference - unsupported handler (' + handler + ')');
+        console.log('On your Drupal site, edit ' + field_name + ' and change the ' +
+          '"Entity Selection Mode" to Views, then follow the README for the ' +
+          'DrupalGap Entity Reference module to set up a View for this field.');
         break;
     }
     
@@ -70,6 +96,7 @@ function _theme_entityreference_pageshow(options) {
     // declare it first.
     var _theme_entityreference_pageshow_success = function(entity) {
       try {
+
         // If we have an entity, it means we are editing it, so build an array
         // of target ids, so we can easily reference them later.
         var target_ids = [];
@@ -94,49 +121,64 @@ function _theme_entityreference_pageshow(options) {
             }
           }
         }
-        views_datasource_get_view_result(options.path, {
-            success: function(results) {
-              if (results.view.count == 0) { return; }
-              //dpm(results);
-              var html = '';
-              // Now that we've got the results, let's render the widget.
-              if (options.widget.module == 'options') {
-                // Check boxes/radio buttons.
-                if (options.widget.type == 'options_buttons') {
-                  $.each(results[results.view.root], function(index, object) {
-                      var referenced_entity = object[results.view.child];
-                      var checkbox_id = options.id + '_' + referenced_entity.nid;
-                      // Build the checkbox.
-                      var checkbox = {
-                        title: referenced_entity.title,
-                        attributes: {
-                          id: checkbox_id,
-                          'class': options.field_name + ' entityreference',
-                          value: referenced_entity.nid,
-                          onclick: '_entityreference_onclick(this, \'' + options.id + '\', \'' + options.field_name + '\')'
+
+        // Depending on what module wants to handle this, build the widget
+        // accordingly.
+        switch (options.widget.module) {
+          
+          // OPTIONS MODULE
+          case 'options':
+            
+            views_datasource_get_view_result(options.path, {
+                success: function(results) {
+                  if (results.view.count == 0) { return; }
+                  //dpm(results);
+                  var html = '';
+                  // Now that we've got the results, let's render the widget.
+                  // Check boxes/radio buttons.
+                  if (options.widget.type == 'options_buttons') {
+                    $.each(results[results.view.root], function(index, object) {
+                        var referenced_entity = object[results.view.child];
+                        var checkbox_id = options.id + '_' + referenced_entity.nid;
+                        // Build the checkbox.
+                        var checkbox = {
+                          title: referenced_entity.title,
+                          attributes: {
+                            id: checkbox_id,
+                            'class': options.field_name + ' entityreference',
+                            value: referenced_entity.nid,
+                            onclick: '_entityreference_onclick(this, \'' + options.id + '\', \'' + options.field_name + '\')'
+                          }
+                        };
+                        // Check it?
+                        if ($.inArray(referenced_entity.nid, target_ids) != -1) {
+                          checkbox.attributes.checked = "";
                         }
-                      };
-                      // Check it?
-                      if ($.inArray(referenced_entity.nid, target_ids) != -1) {
-                        checkbox.attributes.checked = "";
-                      }
-                      // Build the label.
-                      var label = { element:checkbox };
-                      label.element.id = checkbox.attributes.id;
-                      // Finally, theme the checkbox.
-                      html += theme('checkbox', checkbox) + theme('form_element_label', label);
-                  });
+                        // Build the label.
+                        var label = { element:checkbox };
+                        label.element.id = checkbox.attributes.id;
+                        // Finally, theme the checkbox.
+                        html += theme('checkbox', checkbox) + theme('form_element_label', label);
+                    });
+                  }
+                  else {
+                    console.log('WARNING: _theme_entityreference_pageshow - unsupported options widget type (' + options.widget.type + ')');
+                  }
+                  $('#' + options.id + '_container').html(html).trigger('create');
                 }
-                else {
-                  console.log('WARNING: _theme_entityreference_pageshow - unsupported widget type (' + options.widget.type + ')');
-                }
-              }
-              else {
-                console.log('WARNING: _theme_entityreference_pageshow - unsupported widget module (' + options.widget.module + ')');
-              }
-              $('#' + options.id + '_container').html(html).trigger('create');
-            }
-        });
+            });
+            
+            break;
+            
+          // ENTITYREFERENCE MODULE
+          case 'entityreference':
+            break;
+
+          default:
+            console.log('WARNING: _theme_entityreference_pageshow - unsupported widget module (' + options.widget.module + ')');
+            break;
+        }
+        
       }
       catch (error) {
         console.log('_theme_entityreference_pageshow_success - ' + error);
@@ -179,6 +221,7 @@ function entityreference_field_formatter_view(entity_type, entity, field, instan
 function entityreference_assemble_form_state_into_field(entity_type, bundle,
   form_state_value, field, instance, langcode, delta, field_key) {
   try {
+    if (typeof form_state_value === 'undefined') { return null; }
     // For the "check boxes / radio buttons" widget, we must pass something like
     // this: field_name: { und: [123, 456] }
     // @see http://drupal.stackexchange.com/q/42658/10645
