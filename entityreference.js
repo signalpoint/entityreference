@@ -213,11 +213,21 @@ function entityreference_field_formatter_view(entity_type, entity, field, instan
   try {
     var element = {};
     $.each(items, function(delta, item) {
-        element[delta] = {
-          theme: 'button_link',
-          text: item[entity_primary_key_title(item['entity_type'])],
-          path: item['entity_type'] + '/' + item['target_id']
-        };
+        var text = item[entity_primary_key_title(item['entity_type'])];
+        switch (display.settings.link) {
+          // Display as link.
+          case 1:
+            element[delta] = {
+              theme: 'button_link',
+              text: text,
+              path: item['entity_type'] + '/' + item['target_id']
+            };
+            break;
+          // Display as plain text.
+          default:
+            element[delta] = { markup: text };
+            break;
+        }
     });
     return element;
   }
@@ -231,14 +241,25 @@ function entityreference_assemble_form_state_into_field(entity_type, bundle,
   form_state_value, field, instance, langcode, delta, field_key) {
   try {
     if (typeof form_state_value === 'undefined') { return null; }
-    // For the "check boxes / radio buttons" widget, we must pass something like
-    // this: field_name: { und: [123, 456] }
-    // @see http://drupal.stackexchange.com/q/42658/10645
-    var result = [];
-    field_key.use_delta = false;
-    field_key.use_wrapper = false;
-    var ids = form_state_value.split(',');
-    $.each(ids, function(delta, id) { if (!empty(id)) { result.push(id); } });
+    var result = null;
+    switch (instance.widget.type) {
+      case 'entityreference_autocomplete':
+      case 'og_complex': // Adds support for the Organic Groups module.
+        field_key.value = 'target_id';
+        // @see http://drupal.stackexchange.com/a/40347/10645
+        result = '... (' + form_state_value + ')';
+        break;
+      default:
+        // For the "check boxes / radio buttons" widget, we must pass something
+        // like this: field_name: { und: [123, 456] }
+        // @see http://drupal.stackexchange.com/q/42658/10645
+        result = [];
+        field_key.use_delta = false;
+        field_key.use_wrapper = false;
+        var ids = form_state_value.split(',');
+        $.each(ids, function(delta, id) { if (!empty(id)) { result.push(id); } });
+        break;
+    }
     return result;
   }
   catch (error) { console.log('entityreference_assemble_form_state_into_field - ' + error); }
