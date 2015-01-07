@@ -3,13 +3,21 @@
  */
 function entityreference_field_widget_form(form, form_state, field, instance, langcode, items, delta, element) {
   try {
-    items[delta].type = 'textfield';
-    items[delta].children.push({
-        markup: theme('entityreference', {
-            field_info_field: field,
-            field_info_instance: instance
-        })
-    });
+    switch (instance.widget.type) {
+      case 'entityreference_autocomplete':
+      case 'og_complex': // Adds support for the Organic Groups module.
+        items[delta].type = 'autocomplete';
+        items[delta].remote = true;
+        items[delta].path = entityreference_views_json_path(field);
+        items[delta].value = 'nid';
+        items[delta].label = 'title';
+        items[delta].filter = 'title';
+        break;
+      default:
+        console.log('entityreference_field_widget_form - unknown widget type (' + instance.widget.type + ')');
+        return;
+        break;
+    }
   }
   catch (error) { console.log('entityreference_field_widget_form - ' + error); }
 }
@@ -23,7 +31,8 @@ function theme_entityreference(variables) {
     // @TODO - this function name is misleading because its primarily used to
     // provide the widget during node creation/editing, and not associated with
     // the public display of the field, which is typically the case when using
-    // a theme('example', ...) call.
+    // a theme('example', ...) call. The function name should be more of an
+    // extension of the field widget form function's name above.
     
     var html = '';
     
@@ -43,19 +52,18 @@ function theme_entityreference(variables) {
       
       // Views Entity Reference Display
       case 'views':
+      case 'og': // Adds support for Organic Groups module.
         
         // Since our View will need a corresponding Views JSON Display, which
         // will return the same data as the Entity Reference Display that powers
-        // this field, we need to assume to path to retrieve the JSON data.
+        // this field, we need to assume the path to retrieve the JSON data.
         // We will use the machine name of the View, and use the View's Entity
         // Reference Display, and prefix them with 'drupalgap/'. For example,
         // If we had a view with a machine name of 'my_articles' and the machine
         // name of the corresponding entity reference display on the view was
         // 'entityreference_1', then the path we would retrieve the JSON data
         // from in Drupal would be ?q=drupalgap/my_articles/entityreference_1
-        var path = 'drupalgap/' +
-          variables.field_info_field.settings.handler_settings.view.view_name + '/' +
-          variables.field_info_field.settings.handler_settings.view.display_name;
+        var path = entityreference_views_json_path(variables.field_info_field);
           
         // Now that we've got the path to the Views JSON page display, we need
         // to fetch that data and inject it into the widget on the pageshow
@@ -172,6 +180,7 @@ function _theme_entityreference_pageshow(options) {
             
           // ENTITYREFERENCE MODULE
           case 'entityreference':
+          case 'og': // Adds support for the Organic Groups module.
             break;
 
           default:
@@ -255,5 +264,17 @@ function _entityreference_onclick(input, input_id, field_name) {
     $('#' + input_id).val(value);
   }
   catch (error) { console.log('_entityreference_onclick - ' + error); }
+}
+
+/**
+ *
+ */
+function entityreference_views_json_path(field_info_field) {
+  try {
+    return 'drupalgap/' +
+      field_info_field.settings.handler_settings.view.view_name + '/' +
+      field_info_field.settings.handler_settings.view.display_name;
+  }
+  catch (error) { console.log('entityreference_views_json_path - ' + error); }
 }
 
