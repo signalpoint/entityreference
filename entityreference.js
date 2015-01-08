@@ -8,10 +8,10 @@ function entityreference_field_widget_form(form, form_state, field, instance, la
       case 'og_complex': // Adds support for the Organic Groups module.
         items[delta].type = 'autocomplete';
         items[delta].remote = true;
-        items[delta].path = entityreference_views_json_path(field);
         items[delta].value = 'nid';
         items[delta].label = 'title';
         items[delta].filter = 'title';
+        items[delta].path = entityreference_autocomplete_path(field, items[delta]);
         break;
       default:
         console.log('entityreference_field_widget_form - unknown widget type (' + instance.widget.type + ')');
@@ -48,6 +48,7 @@ function theme_entityreference(variables) {
     // Determine the handler for the "Mode" that is set in the "Entity
     // Selection" settings on this field.
     var handler = variables.field_info_field.settings.handler;
+    dpm(handler);
     switch (handler) {
       
       // Views Entity Reference Display
@@ -63,7 +64,7 @@ function theme_entityreference(variables) {
         // name of the corresponding entity reference display on the view was
         // 'entityreference_1', then the path we would retrieve the JSON data
         // from in Drupal would be ?q=drupalgap/my_articles/entityreference_1
-        var path = entityreference_views_json_path(variables.field_info_field);
+        var path = entityreference_autocomplete_path(variables.field_info_field);
           
         // Now that we've got the path to the Views JSON page display, we need
         // to fetch that data and inject it into the widget on the pageshow
@@ -290,12 +291,28 @@ function _entityreference_onclick(input, input_id, field_name) {
 /**
  *
  */
-function entityreference_views_json_path(field_info_field) {
+function entityreference_autocomplete_path(field) {
   try {
-    return 'drupalgap/' +
-      field_info_field.settings.handler_settings.view.view_name + '/' +
-      field_info_field.settings.handler_settings.view.display_name;
+    switch (field.settings.handler) {
+      case 'views':
+      case 'og':
+        // We're using a view, so return the path to the Page display for the
+        // field.
+        return 'drupalgap/' +
+          field.settings.handler_settings.view.view_name + '/' +
+          field.settings.handler_settings.view.display_name;
+        break;
+      case 'base':
+        // If we were passed a form element item, set the autocomplete to custom
+        // so it uses the Index resource instead of Views JSON.
+        var item = arguments[1] ? arguments[1] : null;
+        if (item) { item.custom = true; }
+        // Since we're using the base handler, we'll use the Index resource for
+        // the entity type.
+        return 'drupalgap/' + field.settings.target_type + '.json';
+        break;
+    }
   }
-  catch (error) { console.log('entityreference_views_json_path - ' + error); }
+  catch (error) { console.log('entityreference_autocomplete_path - ' + error); }
 }
 
