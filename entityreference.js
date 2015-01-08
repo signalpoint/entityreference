@@ -27,7 +27,7 @@ function entityreference_field_widget_form(form, form_state, field, instance, la
  */
 function theme_entityreference(variables) {
   try {
-    
+
     // @TODO - this function name is misleading because its primarily used to
     // provide the widget during node creation/editing, and not associated with
     // the public display of the field, which is typically the case when using
@@ -48,7 +48,6 @@ function theme_entityreference(variables) {
     // Determine the handler for the "Mode" that is set in the "Entity
     // Selection" settings on this field.
     var handler = variables.field_info_field.settings.handler;
-    dpm(handler);
     switch (handler) {
       
       // Views Entity Reference Display
