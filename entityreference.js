@@ -247,7 +247,9 @@ function entityreference_assemble_form_state_into_field(entity_type, bundle,
       case 'og_complex': // Adds support for the Organic Groups module.
         field_key.value = 'target_id';
         // @see http://drupal.stackexchange.com/a/40347/10645
-        result = '... (' + form_state_value + ')';
+        if (!empty(form_state_value)) {
+          result = '... (' + form_state_value + ')';
+        }
         break;
       default:
         // For the "check boxes / radio buttons" widget, we must pass something
