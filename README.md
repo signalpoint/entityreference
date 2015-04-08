@@ -12,7 +12,7 @@ Adds Entity Reference support for DrupalGap.
 4. (Optional, but recommended) On your Drupal site, patch the Services module
   with this patch:
   
-  https://www.drupal.org/node/2403645#comment-9491759
+  https://www.drupal.org/node/2403645#comment-9543073
 
 This will allow the "Simple" entity select mode to work on an entity reference
 field widget to work in the app for your content type's add/edit form.
