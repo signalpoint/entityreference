@@ -5,6 +5,7 @@ function entityreference_field_widget_form(form, form_state, field, instance, la
   try {
     switch (instance.widget.type) {
       case 'entityreference_autocomplete':
+      case 'entityreference_autocomplete_tags':
       case 'og_complex': // Adds support for the Organic Groups module.
         items[delta].type = 'autocomplete';
         items[delta].remote = true;
