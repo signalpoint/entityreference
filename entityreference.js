@@ -4,29 +4,18 @@
 function entityreference_field_widget_form(form, form_state, field, instance, langcode, items, delta, element) {
   try {
 
-    // Depending on the entity type, figure out what core entity field we would
-    // display in the results when using an auto complete widget.
-    var core_field = null;
-    switch (field.settings.target_type) {
-      case 'comment': core_field = 'subject'; break;
-      case 'node': core_field = 'title'; break;
-      case 'user': core_field = 'name'; break;
-      case 'taxonomy_term': core_field = 'name'; break;
-      default:
-        console.log('entityreference_field_widget_form - unsupported target type (' + field.settings.target_type + ')');
-        break;
-    }
-
-    // Built the widget based on the type.
+    // Build the widget based on the type (we only support auto complete for
+    // now).
     switch (instance.widget.type) {
       case 'entityreference_autocomplete':
       case 'entityreference_autocomplete_tags':
       case 'og_complex': // Adds support for the Organic Groups module.
+        var key_title = entity_primary_key_title(field.settings.target_type);
         items[delta].type = 'autocomplete';
         items[delta].remote = true;
         items[delta].value = entity_primary_key(field.settings.target_type);
-        items[delta].label = core_field;
-        items[delta].filter = core_field;
+        items[delta].label = key_title;
+        items[delta].filter = key_title;
         items[delta].path = entityreference_autocomplete_path(field, items[delta]);
         break;
       default:
