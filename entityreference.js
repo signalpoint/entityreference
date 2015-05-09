@@ -10,6 +10,8 @@ function entityreference_field_widget_form(form, form_state, field, instance, la
       case 'entityreference_autocomplete':
       case 'entityreference_autocomplete_tags':
       case 'og_complex': // Adds support for the Organic Groups module.
+
+        // Set up the autocomplete.
         var key_title = entity_primary_key_title(field.settings.target_type);
         items[delta].type = 'autocomplete';
         items[delta].remote = true;
@@ -17,6 +19,13 @@ function entityreference_field_widget_form(form, form_state, field, instance, la
         items[delta].label = key_title;
         items[delta].filter = key_title;
         items[delta].path = entityreference_autocomplete_path(field, items[delta]);
+
+        // Set any existing item values.
+        if (items[delta].item && items[delta].item.target_id) {
+          items[delta].default_value = items[delta].item.target_id;
+          items[delta].default_value_label = items[delta].item[key_title];
+        }
+
         break;
       default:
         console.log('entityreference_field_widget_form - unknown widget type (' + instance.widget.type + ')');
