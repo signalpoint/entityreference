@@ -225,23 +225,53 @@ function _theme_entityreference_pageshow(options) {
  */
 function entityreference_field_formatter_view(entity_type, entity, field, instance, langcode, items, display) {
   try {
+
+    //console.log(entity_type);
+    //console.log(entity);
+    //console.log(field);
+    //console.log(instance);
+    //console.log(display);
+
     var element = {};
     $.each(items, function(delta, item) {
-        var text = item[entity_primary_key_title(item['entity_type'])];
-        switch (display.settings.link) {
-          // Display as link.
-          case 1:
-            element[delta] = {
-              theme: 'button_link',
-              text: text,
-              path: item['entity_type'] + '/' + item['target_id']
-            };
+
+        //dpm(delta);
+        //console.log(item);
+
+        switch (display.type) {
+
+          // Label
+          case 'entityreference_label':
+            var text = item[entity_primary_key_title(item['entity_type'])];
+            if (display.settings.link == 1) { // Display as link.
+              element[delta] = {
+                theme: 'button_link',
+                text: text,
+                path: item['entity_type'] + '/' + item['target_id']
+              };
+            }
+            else { // Display as plain text.
+              element[delta] = { markup: '<div>' + text + '</div>' };
+            }
             break;
-          // Display as plain text.
+
+          // Entity id
+          case 'entityreference_entity_id':
+            element[delta] = { markup: '<div>' + item.target_id + '</div>' };
+            break;
+
+          // Rendered entity
+          case 'entityreference_entity_view':
+            drupalgap_entity_render_content(item.entity_type, item.entity);
+            element[delta] = { markup: item.entity.content };
+            break;
+
           default:
-            element[delta] = { markup: text };
+            console.log('entityreference_field_formatter_view - unsupported type: ' + display.type);
             break;
+
         }
+
     });
     return element;
   }
