@@ -25,7 +25,7 @@ Here are some terminal commands that can be used to apply the patch:
 # drush dl services --dev
 # cd services
 # wget https://www.drupal.org/files/issues/index_conditions-2403645-16.patch
-# patch -p1 < index_conditions-2403645-12.patch
+# patch -p1 < index_conditions-2403645-16.patch
 # drush cc all
 ```
 
