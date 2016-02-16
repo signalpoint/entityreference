@@ -14,6 +14,7 @@ function entityreference_field_widget_form(form, form_state, field, instance, la
         // Set up the autocomplete.
         var key_title = entity_primary_key_title(field.settings.target_type);
         items[delta].type = 'autocomplete';
+        items[delta].delta = delta;
         items[delta].remote = true;
         items[delta].value = entity_primary_key(field.settings.target_type);
         items[delta].label = key_title;
