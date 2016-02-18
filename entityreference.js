@@ -361,3 +361,35 @@ function entityreference_autocomplete_path(field) {
   catch (error) { console.log('entityreference_autocomplete_path - ' + error); }
 }
 
+/**
+ * Implements hook_views_exposed_filter().
+ * @param {Object} form
+ * @param {Object} form_state
+ * @param {Object} element
+ * @param {Object} filter
+ * @param {Object} field
+ */
+function entityreference_views_exposed_filter(form, form_state, element, filter, field) {
+  try {
+
+    //console.log('element');
+    //console.log(element);
+    //console.log('filter');
+    //console.log(filter);
+    //console.log('field');
+    //console.log(field);
+
+    // Make a select list with the available value options.
+    element.type = 'select';
+    element.options = {};
+    for (var index in filter.value_options) {
+      if (!filter.value_options.hasOwnProperty(index)) { continue; }
+      element.options[index] =  filter.value_options[index];
+    }
+    if (!empty(filter.value)) { element.value = filter.value[0]; }
+
+    return element;
+
+  }
+  catch (error) { console.log('entityreference_views_exposed_filter - ' + error); }
+}
