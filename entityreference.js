@@ -386,6 +386,12 @@ function entityreference_views_exposed_filter(form, form_state, element, filter,
       if (!filter.value_options.hasOwnProperty(index)) { continue; }
       element.options[index] =  filter.value_options[index];
     }
+    
+    if (!element.required) {
+      element.options['All'] = '- ' + t('Any') + ' -';
+      if (typeof element.value === 'undefined') { element.value = 'All'; }
+    }
+    
     if (!empty(filter.value)) { element.value = filter.value[0]; }
 
     return element;
