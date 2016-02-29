@@ -245,10 +245,14 @@ function entityreference_field_formatter_view(entity_type, entity, field, instan
           case 'entityreference_label':
             var text = item[entity_primary_key_title(item['entity_type'])];
             if (display.settings.link == 1) { // Display as link.
+              var prefix = item['entity_type'];
+              if (in_array(prefix, ['taxonomy_term', 'taxonomy_vocabulary'])) {
+                prefix = prefix.replace('_', '/');
+              }
               element[delta] = {
                 theme: 'button_link',
                 text: text,
-                path: item['entity_type'] + '/' + item['target_id']
+                path: prefix + '/' + item['target_id']
               };
             }
             else { // Display as plain text.
