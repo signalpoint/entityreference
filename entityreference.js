@@ -1,4 +1,42 @@
 /**
+ * Given settings from an entity reference field's field_info_field object, this will
+ * return an array of bundle names that are used for the target when using Simple entity
+ * selection mode. It will return null if there are no target bundles.
+ * @param field_settings
+ * @returns {*}
+ */
+function entityreference_get_target_bundles(field_settings) {
+  try {
+    var bundles = [];
+    for (var bundle in field_settings.handler_settings.target_bundles) {
+      if (!field_settings.handler_settings.target_bundles.hasOwnProperty(bundle)) { continue; }
+      var name = field_settings.handler_settings.target_bundles[bundle];
+      var bundle_info = entityreference_get_bundle_and_name_from_field_settings(bundle, field_settings);
+      if (bundle_info.bundle) { bundles.push(bundle_info.bundle); }
+    }
+    return bundles.length ? bundles : null;
+  }
+  catch (error) { console.log('entityreference_get_target_bundles - ' + error); }
+}
+
+function entityreference_get_bundle_and_name_from_field_settings(target_bundle, field_settings) {
+  var result = {
+    name: null,
+    bundle: null
+  };
+  switch (field_settings.target_type) {
+    case 'node':
+      result.bundle_name = 'type';
+      break;
+    case 'taxonomy_term':
+      result.bundle_name = 'vid';
+      result.bundle = taxonomy_vocabulary_get_vid_from_name(target_bundle);
+      break;
+  }
+  return result;
+}
+
+/**
  * Implements hook_field_widget_form().
  */
 function entityreference_field_widget_form(form, form_state, field, instance, langcode, items, delta, element) {
@@ -56,6 +94,22 @@ function theme_entityreference(variables) {
     // We'll make the actual field hidden, and the widget will populate the
     // hidden input later.
     //html += '<input type="hidden" ' + drupalgap_attributes(variables.attributes) + '/>';
+
+    // Figure out the entity type index involved.
+    var entity_type = null;
+    var entity_type_index = null;
+    if (typeof variables.field_info_instance.settings.behaviors !== 'undefined') {
+      for (entity_type_index in variables.field_info_instance.settings.behaviors) {
+        if (!variables.field_info_instance.settings.behaviors.hasOwnProperty(entity_type_index)) { continue; }
+        var behavior = variables.field_info_instance.settings.behaviors[entity_type_index];
+        if (behavior.status) {
+          entity_type_index = entity_type_index.replace(/-/g, '_');
+          entity_type_index = entity_type_index.replace('taxonomy', 'taxonomy_term');
+          entity_type = entity_type_index.replace('_index', '');
+          break;
+        }
+      }
+    }
     
     // We'll also add an empty div container where the widget will get rendered.
     html += '<div id="' + variables.attributes.id + '_container"></div>';
@@ -68,6 +122,7 @@ function theme_entityreference(variables) {
       // Views Entity Reference Display
       case 'views':
       case 'og': // Adds support for Organic Groups module.
+      case 'base':
         
         // Since our View will need a corresponding Views JSON Display, which
         // will return the same data as the Entity Reference Display that powers
@@ -88,19 +143,20 @@ function theme_entityreference(variables) {
             jqm_page_event: 'pageshow',
             jqm_page_event_callback: '_theme_entityreference_pageshow',
             jqm_page_event_args: JSON.stringify({
-                id: variables.attributes.id,
-                path: path,
-                widget: variables.field_info_instance.widget,
-                field_name: field_name
+              id: variables.attributes.id,
+              path: path,
+              widget: variables.field_info_instance.widget,
+              field_name: field_name,
+              entity_type: entity_type,
+              entity_type_index: entity_type_index,
+              bundles: entityreference_get_target_bundles(variables.field_info_field.settings),
+              cardinality: variables.field_info_field.cardinality
             })
         });
         break;
       
       default:
         console.log('WARNING: theme_entityreference - unsupported handler (' + handler + ')');
-        console.log('On your Drupal site, edit ' + field_name + ' and change the ' +
-          '"Entity Selection Mode" to Views, then follow the README for the ' +
-          'DrupalGap Entity Reference module to set up a View for this field.');
         break;
     }
     
@@ -145,69 +201,164 @@ function _theme_entityreference_pageshow(options) {
           }
         }
 
-        // Depending on what module wants to handle this, build the widget
-        // accordingly.
-        switch (options.widget.module) {
-          
-          // OPTIONS MODULE
-          case 'options':
-            
-            views_datasource_get_view_result(options.path, {
-                success: function(results) {
-                  if (results.view.count == 0) { return; }
-                  //dpm(results);
-                  var html = '';
-                  // Now that we've got the results, let's render the widget.
-                  // Check boxes/radio buttons.
-                  if (options.widget.type == 'options_buttons') {
-                    $.each(results[results.view.root], function(index, object) {
-                        var referenced_entity = object[results.view.child];
-                        var checkbox_id = options.id + '_' + referenced_entity.nid;
+        // Build the query to the entity index resource.
+        var primary_key = entity_primary_key(options.entity_type);
+        var label = entity_primary_key_title(options.entity_type);
+        var bundles = options.bundles;
+        var index_options = { orderby: {}};
+        index_options.orderby[label] = 'asc';
+        var query = {
+          parameters: {},
+          fields: [primary_key, label],
+          options: index_options
+        };
+        if (bundles) { query.parameters[entity_get_bundle_name(options.entity_type)] = bundles.join(','); }
+
+        // Call the index resource for the entity type.
+        window[options.entity_type_index](query, { success: function(entities) {
+
+          if (!entities || entities.length == 0) { return; }
+
+          // Depending on what module wants to handle this, build the widget accordingly.
+          // @TODO add support for parent/child term indentation on select lists, radios, checkboxes.
+          var html = '';
+          var select_options = null;
+          var css_classes = options.field_name + ' entityreference';
+          for (var i = 0; i < entities.length; i++) {
+            var referenced_entity = entities[i];
+
+            switch (options.widget.module) {
+
+              // OPTIONS MODULE
+              case 'options':
+
+                switch (options.widget.type) {
+
+                  // Select list.
+                  case 'options_select':
+
+                    // Set aside the options until later.
+                    if (!select_options) { select_options = {}; }
+                    select_options[referenced_entity[primary_key]] = referenced_entity[label];
+
+                    break;
+
+                  // Checkboxes and radios.
+                  case 'options_buttons':
+
+                      // Radios.
+                      if (options.cardinality == 1) {
+
+                        // Set aside the options until later.
+                        if (!select_options) { select_options = {}; }
+                        select_options[referenced_entity[primary_key]] = referenced_entity[label];
+
+                      }
+
+                      // Checkboxes
+                      else {
+
                         // Build the checkbox.
+                        var checkbox_id = options.id + '_' + referenced_entity[primary_key];
                         var checkbox = {
-                          title: referenced_entity.title,
+                          title: referenced_entity[label],
                           attributes: {
                             id: checkbox_id,
-                            'class': options.field_name + ' entityreference',
-                            value: referenced_entity.nid,
+                            'class': css_classes,
+                            value: referenced_entity[primary_key],
                             onclick: '_entityreference_onclick(this, \'' + options.id + '\', \'' + options.field_name + '\')'
                           }
                         };
+
                         // Check it?
-                        if ($.inArray(referenced_entity.nid, target_ids) != -1) {
+                        if ($.inArray(referenced_entity[primary_key], target_ids) != -1) {
                           checkbox.attributes.checked = "";
                         }
-                        // Build the label.
-                        var label = { element:checkbox };
-                        label.element.id = checkbox.attributes.id;
-                        // Finally, theme the checkbox.
-                        html += theme('checkbox', checkbox) + theme('form_element_label', label);
-                    });
-                  }
-                  else {
-                    console.log('WARNING: _theme_entityreference_pageshow - unsupported options widget type (' + options.widget.type + ')');
-                  }
-                  $('#' + options.id + '_container').html(html).trigger('create');
-                }
-            });
-            
-            break;
-            
-          // ENTITYREFERENCE MODULE
-          case 'entityreference':
-          case 'og': // Adds support for the Organic Groups module.
-            break;
 
-          default:
-            console.log('WARNING: _theme_entityreference_pageshow - unsupported widget module (' + options.widget.module + ')');
-            break;
-        }
+                        // Build the label.
+                        var input_label = { element:checkbox };
+                        input_label.element.id = checkbox.attributes.id;
+
+                        // Finally, theme the checkbox.
+                        html += theme('checkbox', checkbox) + theme('form_element_label', input_label);
+
+                      }
+
+                    break;
+
+                  default:
+                    console.log('WARNING: _theme_entityreference_pageshow - unsupported options widget type (' + options.widget.type + ')');
+                    break;
+                }
+
+                break;
+
+              // ENTITYREFERENCE MODULE
+              case 'entityreference':
+              case 'og': // Adds support for the Organic Groups module.
+                break;
+
+              default:
+                console.log('WARNING: _theme_entityreference_pageshow - unsupported widget module (' + options.widget.module + ')');
+                break;
+            }
+          }
+
+          // Do any post processing...
+
+          // Handle select list options.
+          if (options.widget.type == 'options_select' && select_options) {
+            html += theme('select', {
+              attributes: {
+                id: options.id,
+                'class': css_classes
+              },
+              options: select_options,
+              value: target_ids.join(',')
+            });
+          }
+
+          // Radio buttons and check boxes.
+          else if (options.widget.type == 'options_buttons') {
+
+            // Radios.
+            if (options.cardinality == 1 && select_options) {
+              html += theme('radios', {
+                attributes: {
+                  id: options.id,
+                  'class': css_classes,
+                  onclick: '_entityreference_onclick(this, \'' + options.id + '\', \'' + options.field_name + '\')'
+                },
+                options: select_options,
+                value: target_ids.join(',')
+              });
+            }
+
+            // Checkboxes.
+            else{
+
+            }
+
+            // Theme the hidden input to hold the value.
+            html = theme('hidden', {
+              attributes: {
+                id: options.id,
+                value: target_ids.join(',')
+              }
+            }) + html;
+
+          }
+
+          // Finally inject the html into the waiting container.
+          $('#' + options.id + '_container').html(html).trigger('create');
+
+        }});
         
       }
       catch (error) {
         console.log('_theme_entityreference_pageshow_success - ' + error);
       }
-    }
+    };
     // If we're editing an entity, we need to load the entity object, then pass
     // it along to our success handler declared earlier. If we're not editing,
     // just go directly to the success handler with a null entity.
