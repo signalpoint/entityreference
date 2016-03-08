@@ -21,12 +21,13 @@ function entityreference_get_target_bundles(field_settings) {
 
 function entityreference_get_bundle_and_name_from_field_settings(target_bundle, field_settings) {
   var result = {
-    name: null,
+    bundle_name: null,
     bundle: null
   };
   switch (field_settings.target_type) {
     case 'node':
       result.bundle_name = 'type';
+        if (target_bundle == 'group') { result.bundle = target_bundle; }
       break;
     case 'taxonomy_term':
       result.bundle_name = 'vid';
@@ -495,7 +496,6 @@ function entityreference_autocomplete_path(field) {
   try {
     switch (field.settings.handler) {
       case 'views':
-      case 'og':
         // We're using a view, so return the path to the Page display for the
         // field.
         return 'drupalgap/' +
@@ -503,6 +503,7 @@ function entityreference_autocomplete_path(field) {
           field.settings.handler_settings.view.display_name;
         break;
       case 'base':
+      case 'og':
         // If we were passed a form element item, set the autocomplete to custom
         // so it uses the Index resource instead of Views JSON.
         if (arguments[1]) { arguments[1].custom = true; }
